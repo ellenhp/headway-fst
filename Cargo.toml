@@ -1,12 +1,11 @@
 [package]
-name = "tantivy-fst"
+name = "fst"
 version = "0.3.0"
 authors = ["Andrew Gallant <jamslam@gmail.com>"] # forked from Andrew Gallant's work
 description = """
-This is a tantivy-specific fork from the fst crate from Burntsushi. (Please use the fst crate instead.)
+This is a headway-specific fork from the fst crate from Burntsushi. (Please use the fst crate instead.)
 """
-documentation = "https://docs.rs/tantivy-fst"
-repository = "https://github.com/tantivy-search/fst"
+repository = "https://github.com/ellenhp/headway-fst"
 readme = "README.md"
 keywords = ["donotuseme"]
 license = "Unlicense/MIT"
