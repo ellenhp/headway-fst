@@ -18,6 +18,7 @@ option of specifying a merge strategy for output values.
 
 Most of the rest of the types are streams from set operations.
 */
+use std::io::Cursor;
 use std::{cmp, mem};
 use std::{
     fmt,
@@ -27,7 +28,10 @@ use std::{io::Read, ops::Deref};
 
 use byteorder::{LittleEndian, ReadBytesExt};
 
-use crate::{automaton::{AlwaysMatch, Automaton}, fake_arr::{FakeArr, FakeArrRef, Ulen, empty, slice_to_fake_arr}};
+use crate::{
+    automaton::{AlwaysMatch, Automaton},
+    fake_arr::{empty, slice_to_fake_arr, FakeArr, FakeArrRef, Ulen},
+};
 use crate::{error::Result, slic};
 use crate::{
     fake_arr::{full_slice, FakeArrSlice, ShRange},
@@ -278,8 +282,7 @@ pub type CompiledAddr = Ulen;
 ///   (excellent for in depth overview)
 /// * [Comparison of Construction Algorithms for Minimal, Acyclic, Deterministic, Finite-State Automata from Sets of Strings](http://www.cs.mun.ca/~harold/Courses/Old/CS4750/Diary/q3p2qx4lv71m5vew.pdf)
 ///   (excellent for surface level overview)
-pub struct Fst<Data: FakeArr = Vec<u8>>
-{
+pub struct Fst<Data: FakeArr = Vec<u8>> {
     meta: FstMeta,
     data: Data,
 }
@@ -314,7 +317,7 @@ impl FstMeta {
 
 impl<Data: FakeArr> Fst<Data> {
     /// Open a `Fst` from a given data.
-    pub fn new(data: Data) -> Result<Fst<Data>> {
+    pub async fn new(data: Data) -> Result<Fst<Data>> {
         // let data = data.into();
         if data.len() < 32 {
             return Err(Error::Format.into());
@@ -326,7 +329,10 @@ impl<Data: FakeArr> Fst<Data> {
         // N bytes (no unexpected EOF).
         let mut flonk = slic!(data[0..]);
 
-        let version = flonk.read_u64::<LittleEndian>().unwrap();
+        let mut buf64: [u8; 8] = [0; 8];
+        flonk.read(&mut buf64).await.unwrap();
+
+        let version = Cursor::new(buf64).read_u64::<LittleEndian>().unwrap();
         if version == 0 || version > VERSION {
             return Err(Error::Version {
                 expected: VERSION,
@@ -335,15 +341,19 @@ impl<Data: FakeArr> Fst<Data> {
             .into());
         }
         let mut bonk = slic!(data[8..]);
-        let ty = bonk.read_u64::<LittleEndian>().unwrap();
+
+        bonk.read(&mut buf64).await.unwrap();
+        let ty = Cursor::new(buf64).read_u64::<LittleEndian>().unwrap();
         let root_addr = {
             let mut last = slic!(data[(data.len() - 8)..]);
+            last.read(&mut buf64).await.unwrap();
             // println!("len={}, d={:#?}, data={:?}, full={:#?}", data.len(), last, last.to_vec(), data.to_vec());
-            u64_to_Ulen(last.read_u64::<LittleEndian>().unwrap())
+            u64_to_Ulen(Cursor::new(buf64).read_u64::<LittleEndian>().unwrap())
         };
         let len = {
             let mut last2 = slic!(data[(data.len() - 16)..]);
-            u64_to_Ulen(last2.read_u64::<LittleEndian>().unwrap())
+            last2.read(&mut buf64).await.unwrap();
+            u64_to_Ulen(Cursor::new(buf64).read_u64::<LittleEndian>().unwrap())
         };
         println!("root={}, len={}", root_addr, len);
         // The root node is always the last node written, so its address should

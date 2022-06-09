@@ -28,6 +28,7 @@ byteorder = "1"
 regex-syntax = "0.6"
 utf8-ranges = "1"
 wasm-bindgen = "0.2"
+futures = "0.3.21"
 
 [dev-dependencies]
 fnv = "1.0.5"
@@ -35,6 +36,7 @@ lazy_static = "1.4"
 quickcheck = { version = "0.7", default-features = false }
 rand = "0.5"
 proptest = "0.9.4"
+tokio-test = "0.4.2"
 
 [profile.release]
 debug = true

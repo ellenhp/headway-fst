@@ -5,10 +5,14 @@ use std::ops::Range;
 
 use byteorder::WriteBytesExt;
 
-use crate::{fake_arr::{FakeArr, FakeArrRef, Ulen, empty}, raw::build::BuilderNode, slic, slic2};
 use crate::raw::common_inputs::{COMMON_INPUTS, COMMON_INPUTS_INV};
 use crate::raw::pack::{pack_size, pack_uint, pack_uint_in, unpack_uint};
 use crate::raw::{u64_to_Ulen, CompiledAddr, Output, Transition, EMPTY_ADDRESS};
+use crate::{
+    fake_arr::{empty, FakeArr, FakeArrRef, Ulen},
+    raw::build::BuilderNode,
+    slic, slic2,
+};
 
 /// The threshold (in number of transitions) at which an index is created for
 /// a node's transitions. This speeds up lookup time at the expense of FST
@@ -600,7 +604,13 @@ impl StateAnyTrans {
     }
 
     #[inline(always)]
-    fn final_output(self, version: u64, data: FakeArrRef, sizes: PackSizes, ntrans: Ulen) -> Output {
+    fn final_output(
+        self,
+        version: u64,
+        data: FakeArrRef,
+        sizes: PackSizes,
+        ntrans: Ulen,
+    ) -> Output {
         let osize = sizes.output_pack_size();
         if osize == 0 || !self.is_final_state() {
             return Output::zero();
@@ -839,10 +849,13 @@ fn unpack_delta(slice: FakeArrRef<'_>, trans_pack_size: Ulen, node_addr: Ulen) -
 mod tests {
     use quickcheck::{quickcheck, TestResult};
 
-    use crate::{fake_arr::{FakeArr, Ulen, slice_to_fake_arr}, raw::build::BuilderNode};
     use crate::raw::node::{node_new, Node};
     use crate::raw::{Builder, CompiledAddr, Fst, Output, Transition, VERSION};
     use crate::stream::Streamer;
+    use crate::{
+        fake_arr::{slice_to_fake_arr, FakeArr, Ulen},
+        raw::build::BuilderNode,
+    };
 
     const NEVER_LAST: CompiledAddr = ::std::u64::MAX as CompiledAddr;
 
@@ -856,7 +869,7 @@ mod tests {
             for word in &bs {
                 bfst.add(word).unwrap();
             }
-            let fst = Fst::new(bfst.into_inner().unwrap()).unwrap();
+            let fst = tokio_test::block_on(Fst::new(bfst.into_inner().unwrap())).unwrap();
             let mut rdr = fst.stream();
             let mut words = vec![];
             while let Some(w) = rdr.next() {

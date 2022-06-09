@@ -139,7 +139,7 @@ pub struct FakeArrSlice<'a> {
     len: Ulen,
 }
 impl<'a> FakeArrSlice<'a> {
-    pub fn get_offset(&self) -> Ulen {
+    pub async fn get_offset(&self) -> Ulen {
         self.offset
     }
     // the same as .slice, but returns a thing of the lifetime of the root real fake array instead of this part so the returned part can live longer than this one
@@ -151,9 +151,8 @@ impl<'a> FakeArrSlice<'a> {
             len,
         };
     }
-}
-impl Read for FakeArrSlice<'_> {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+
+    pub async fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         let read_len = std::cmp::min(buf.len() as Ulen, self.len);
         let res = (*self).read_into(0, buf).map(|()| read_len as usize);
         self.offset += read_len;
@@ -181,7 +180,6 @@ impl<'a> FakeArr for FakeArrSlice<'a> {
 }
 
 pub type FakeArrRef<'a> = FakeArrSlice<'a>;
-
 
 impl FakeArr for Vec<u8> {
     fn len(&self) -> Ulen {

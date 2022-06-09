@@ -1,11 +1,14 @@
-use crate::{automaton::AlwaysMatch, fake_arr::{FakeArr, FakeArrRef}};
 use crate::error::Error;
 use crate::inner_automaton::Automaton;
 use crate::raw::{self, Bound, Buffer, Builder, Fst, Output, Stream, VERSION};
+use crate::slic;
 use crate::stream::Streamer;
+use crate::{
+    automaton::AlwaysMatch,
+    fake_arr::{FakeArr, FakeArrRef},
+};
 use crate::{IntoStreamer, Regex};
 use std::ops::Deref;
-use crate::slic;
 
 const TEXT: &'static str = include_str!("./../../data/words-100000");
 
@@ -32,7 +35,7 @@ where
     for s in ss.iter().into_iter() {
         bfst.add(s).unwrap();
     }
-    let fst = Fst::new(bfst.into_inner().unwrap()).unwrap();
+    let fst = tokio_test::block_on(Fst::new(bfst.into_inner().unwrap())).unwrap();
     ss.dedup();
     assert_eq!(fst.len() as usize, ss.len());
     fst
@@ -54,7 +57,7 @@ where
         bfst.insert(s, o).unwrap();
     }
     let d = bfst.into_inner().unwrap();
-    Fst::new(d).unwrap()
+    tokio_test::block_on(Fst::new(d)).unwrap()
 }
 
 pub fn fst_inputs(fst: &Fst) -> Vec<Vec<u8>> {
@@ -221,7 +224,7 @@ fn fst_map_100000_lengths() {
 
 #[test]
 fn invalid_version() {
-    match Fst::new(vec![0; 32]) {
+    match tokio_test::block_on(Fst::new(vec![0; 32])) {
         Err(Error::Fst(raw::Error::Version { got, .. })) => assert_eq!(got, 0),
         Err(err) => panic!("expected version error, got {:?}", err),
         Ok(_) => panic!("expected version error, got FST"),
@@ -234,7 +237,7 @@ fn invalid_version_crate_too_old() {
 
     let mut buf = vec![0; 32];
     LittleEndian::write_u64(&mut buf, VERSION + 1);
-    match Fst::new(buf) {
+    match tokio_test::block_on(Fst::new(buf)) {
         Err(Error::Fst(raw::Error::Version { got, .. })) => {
             assert_eq!(got, VERSION + 1);
         }
@@ -245,7 +248,7 @@ fn invalid_version_crate_too_old() {
 
 #[test]
 fn invalid_format() {
-    match Fst::new(vec![0; 0]) {
+    match tokio_test::block_on(Fst::new(vec![0; 0])) {
         Err(Error::Fst(raw::Error::Format)) => {}
         Err(err) => panic!("expected format error, got {:?}", err),
         Ok(_) => panic!("expected format error, got FST"),
@@ -321,7 +324,6 @@ fn to_mem(v: (FakeArrRef<'_>, raw::Output)) -> (Vec<u8>, raw::Output) {
         assert_eq!(rdr.next(), None);
     }
 }*/
-
 
 test_range! {
     fst_range_empty_1,
@@ -661,7 +663,10 @@ fn test_return_node_on_reverse_only_if_match() {
     let fst: Fst = fst_map(items.clone()).into();
     let automaton = Regex::new("ab").unwrap();
     let mut stream = fst.search(automaton).backward().into_stream();
-    assert_eq!(stream.next().map(to_mem), Some((b"ab"[..].to_vec(), Output::new(1u64))));
+    assert_eq!(
+        stream.next().map(to_mem),
+        Some((b"ab"[..].to_vec(), Output::new(1u64)))
+    );
     assert_eq!(stream.next().map(to_mem), None);
 }
 
@@ -822,7 +827,10 @@ fn test_simple() {
         Bound::Included(b"a".to_vec()),
         true,
     );
-    assert_eq!(stream.next().map(to_mem), Some((b""[..].to_vec(), Output::new(0u64))));
+    assert_eq!(
+        stream.next().map(to_mem),
+        Some((b""[..].to_vec(), Output::new(0u64)))
+    );
     assert!(stream.next().is_none());
 }
 
@@ -951,7 +959,8 @@ macro_rules! test_range_with_aut {
                 .collect();
             let fst: Fst = fst_map(items.clone()).into();
             {
-                let mut rdr = Stream::new(&fst.meta, fst.data.full_slice(), $aut, $min, $max, false);
+                let mut rdr =
+                    Stream::new(&fst.meta, fst.data.full_slice(), $aut, $min, $max, false);
                 for i in $imin..$imax {
                     assert_eq!(
                         to_mem(rdr.next().unwrap()),
